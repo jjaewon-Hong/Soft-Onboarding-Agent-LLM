@@ -57,7 +57,7 @@ def fetch_recent_commits(username, token, repo_name, limit=100):
 
 import base64
 
-def fetch_file_contents(username, token, repo_name, file_paths, max_files=15):
+def fetch_file_contents(username, token, repo_name, file_paths, max_files=None):
     """
     분류된 파일들의 실제 내용을 GitHub API를 통해 가져옵니다.
     """
@@ -67,7 +67,11 @@ def fetch_file_contents(username, token, repo_name, file_paths, max_files=15):
     }
     
     contents = []
-    for path in file_paths[:max_files]:
+    # max_files가 None이면 제한 없이 모든 파일을 가져옵니다.
+    target_paths = file_paths if max_files is None else file_paths[:max_files]
+    
+    for path in target_paths:
+            
         url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
         resp = requests.get(url, headers=headers)
         if resp.status_code == 200:
@@ -76,6 +80,32 @@ def fetch_file_contents(username, token, repo_name, file_paths, max_files=15):
                 try:
                     decoded = base64.b64decode(data['content']).decode('utf-8')
                     contents.append(f"--- FILE: {path} ---\n{decoded}\n")
+                except Exception as e:
+                    print(f"Error decoding file {path}: {e}")
+    return "\n".join(contents)
+
+def fetch_file_contents_dict(username, token, repo_name, file_paths, max_files=None):
+    """
+    분류된 파일들의 실제 내용을 GitHub API를 통해 가져와서 딕셔너리로 반환합니다.
+    (키: 파일 경로, 값: 파일 내용)
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    contents_dict = {}
+    target_paths = file_paths if max_files is None else file_paths[:max_files]
+    
+    for path in target_paths:
+        url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{path}"
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('encoding') == 'base64':
+                try:
+                    decoded = base64.b64decode(data['content']).decode('utf-8')
+                    contents_dict[path] = decoded
                 except Exception:
                     continue
-    return "\n".join(contents)
+    return contents_dict
